@@ -4,10 +4,10 @@
  *
  * @format
  */
-
-import React from 'react';
+import React, {useEffect, useState} from 'react';
 import type {PropsWithChildren} from 'react';
 import {
+  Alert,
   SafeAreaView,
   ScrollView,
   StatusBar,
@@ -16,7 +16,6 @@ import {
   useColorScheme,
   View,
 } from 'react-native';
-
 import {
   Colors,
   DebugInstructions,
@@ -24,79 +23,60 @@ import {
   LearnMoreLinks,
   ReloadInstructions,
 } from 'react-native/Libraries/NewAppScreen';
-
-type SectionProps = PropsWithChildren<{
-  title: string;
-}>;
-
-function Section({children, title}: SectionProps): React.JSX.Element {
-  const isDarkMode = useColorScheme() === 'dark';
-  return (
-    <View style={styles.sectionContainer}>
-      <Text
-        style={[
-          styles.sectionTitle,
-          {
-            color: isDarkMode ? Colors.white : Colors.black,
-          },
-        ]}>
-        {title}
-      </Text>
-      <Text
-        style={[
-          styles.sectionDescription,
-          {
-            color: isDarkMode ? Colors.light : Colors.dark,
-          },
-        ]}>
-        {children}
-      </Text>
-    </View>
-  );
-}
+import {useCameraPermission, useCameraDevice} from 'react-native-vision-camera';
+import {Camera} from 'react-native-vision-camera';
+import PermissionScreen from './perimissions.tsx';
+import {useCodeScanner} from 'react-native-vision-camera';
 
 function App(): React.JSX.Element {
   const isDarkMode = useColorScheme() === 'dark';
+  const {hasPermission, requestPermission} = useCameraPermission();
+  const [currentCode, setCurrentCode] = useState<string | null>(null);
+  const device = useCameraDevice('back');
 
   const backgroundStyle = {
     backgroundColor: isDarkMode ? Colors.darker : Colors.lighter,
   };
 
+  const codeScanner = useCodeScanner({
+    codeTypes: ['qr', 'ean-13'],
+    onCodeScanned: codes => {
+      if (codes.length > 0) {
+        const latestCode = codes[codes.length - 1];
+        const codeValue = latestCode.value;
+        if (codeValue !== undefined) {
+          setCurrentCode(codeValue);
+          console.log(`Scanned code: ${codeValue}`);
+          Alert.alert('Scanned!', `Scanned code: ${codeValue}`);
+        }
+      }
+    },
+  });
+  if (!hasPermission) {
+    return <PermissionScreen onPress={requestPermission} />;
+  } else if (!device) {
+    return (
+      <View style={styles.container}>
+        <Text style={styles.text}>No camera device found on this device.</Text>
+      </View>
+    );
+  }
+
   return (
-    <SafeAreaView style={backgroundStyle}>
-      <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
-        backgroundColor={backgroundStyle.backgroundColor}
-      />
-      <ScrollView
-        contentInsetAdjustmentBehavior="automatic"
-        style={backgroundStyle}>
-        <Header />
-        <View
-          style={{
-            backgroundColor: isDarkMode ? Colors.black : Colors.white,
-          }}>
-          <Section title="Step One">
-            Edit <Text style={styles.highlight}>App.tsx</Text> to change this
-            screen and then come back to see your edits.
-          </Section>
-          <Section title="See Your Changes">
-            <ReloadInstructions />
-          </Section>
-          <Section title="Debug">
-            <DebugInstructions />
-          </Section>
-          <Section title="Learn More">
-            Read the docs to discover what to do next:
-          </Section>
-          <LearnMoreLinks />
-        </View>
-      </ScrollView>
-    </SafeAreaView>
+    <Camera
+      style={styles.camera}
+      device={device}
+      isActive={true}
+      codeScanner={codeScanner}
+    />
   );
 }
 
 const styles = StyleSheet.create({
+  camera: {
+    width: 300,
+    height: 300,
+  },
   sectionContainer: {
     marginTop: 32,
     paddingHorizontal: 24,
@@ -112,6 +92,18 @@ const styles = StyleSheet.create({
   },
   highlight: {
     fontWeight: '700',
+  },
+  container: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#fff',
+  },
+  text: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    textAlign: 'center',
+    color: '#333',
   },
 });
 
