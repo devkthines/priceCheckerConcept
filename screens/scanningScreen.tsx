@@ -1,5 +1,5 @@
 // screens/ScanningScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, FlatList, StyleSheet, Alert, Modal,TextInput } from 'react-native';
 import { Text, Button } from 'react-native-paper';
 import { useCameraPermission, useCameraDevice, useCodeScanner, CodeScanner, Code } from 'react-native-vision-camera';
@@ -35,13 +35,14 @@ const ScanningScreen = () => {
   const [modalVisible, setModalVisible] = useState<boolean>(false);
   const [updatedPrice, setUpdatedPrice] = useState<number | null>(null);
   const [scannedItem, setScannedItem] = useState<ItemData | null>(null);
+  const [alertVisible, setAlertVisible] = useState<boolean>(false);
 
   const { hasPermission, requestPermission } = useCameraPermission();
   const device = useCameraDevice('back');
   const codeScanner = useCodeScanner({
     codeTypes: ['qr', 'ean-13'],
     onCodeScanned: (codes: Code[]) => {
-      if (codes.length > 0) {
+      if (codes.length > 0 && !alertVisible) {
         const latestCode = codes[codes.length - 1];
         const codeValue = latestCode.value;
         if (codeValue !== undefined) {
@@ -50,6 +51,7 @@ const ScanningScreen = () => {
           const foundItem = allItems.find((item) => item.upc === codeValue);
           if (foundItem) {
             setScannedItem(foundItem);
+            setAlertVisible(true);
             Alert.alert(
               'Scanned!',
               `Scanned code: ${codeValue}\nName: ${foundItem.name}\nPrice: ${foundItem.retailPrice}`,
@@ -61,6 +63,7 @@ const ScanningScreen = () => {
                 {
                   text: 'OK',
                   style: 'cancel',
+                  onPress: () => setAlertVisible(false),
                 },
               ]
             );
@@ -87,18 +90,13 @@ const ScanningScreen = () => {
       setModalVisible(false);
       setUpdatedPrice(null);
       setScannedItem(null);
+      setAlertVisible(false);
       Alert.alert('Price Updated', 'The database has been updated.');
     }
   };
 
   if (!hasPermission) {
     return <PermissionScreen onPress={requestPermission} />;
-  } else if (!device) {
-    return (
-      <View style={styles.container}>
-        <Text style={styles.text}>No camera device found on this device.</Text>
-      </View>
-    );
   }
 
   const renderCategory = (category: string) => (
@@ -122,7 +120,9 @@ const ScanningScreen = () => {
 
   return (
     <View style={styles.container}>
-      <Camera style={styles.cameraPreview} device={device} isActive={true} codeScanner={codeScanner} />
+      {!alertVisible && (
+        <Camera style={styles.cameraPreview} device={device} isActive={true} codeScanner={codeScanner} />
+      )}
       {Object.keys(data).map((category) => renderCategory(category))}
       <Button onPress={handleExit}>Exit</Button>
       <Button onPress={handleBackToSelection}>Back to Selection</Button>
